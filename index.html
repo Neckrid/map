@@ -12,6 +12,7 @@
 <style>
 body{margin:0;background:#111;font-family:Arial;color:white;}
 #map{height:100vh;display:none;}
+
 .panel{
  position:absolute;top:50%;left:50%;
  transform:translate(-50%,-50%);
@@ -19,31 +20,49 @@ body{margin:0;background:#111;font-family:Arial;color:white;}
  border-radius:12px;width:90%;max-width:400px;
  text-align:center;
 }
-input,button{
+
+input{
  width:100%;padding:12px;margin:8px 0;
  border-radius:8px;border:none;font-size:16px;
 }
-button{background:#2c7be5;color:white;}
-#coords{
- position:absolute;bottom:10px;left:10px;
- background:black;padding:6px 10px;
- border-radius:8px;font-size:14px;
- display:none;z-index:1000;
+
+button{
+ padding:10px 16px;
+ border-radius:8px;
+ border:none;
+ font-size:14px;
+ background:#2c7be5;
+ color:white;
+ cursor:pointer;
 }
+
 #logoutBtn{
- position:absolute;top:10px;right:10px;
- padding:8px 12px;
- border:none;border-radius:6px;
- background:#e55353;color:white;
+ position:absolute;
+ top:10px;
+ left:50%;
+ transform:translateX(-50%);
+ background:#e55353;
+ display:none;
+ font-size:13px;
+ padding:6px 14px;
+ z-index:1000;
+}
+
+#coords{
+ position:absolute;
+ bottom:10px;
+ left:10px;
+ background:black;
+ padding:6px 10px;
+ border-radius:8px;
+ font-size:14px;
  display:none;
  z-index:1000;
 }
-#adminInfo{
- position:absolute;top:10px;left:10px;
- background:#000;padding:6px 10px;
- border-radius:6px;font-size:14px;
- display:none;
- z-index:1000;
+
+.leaflet-div-icon{
+ background:transparent !important;
+ border:none !important;
 }
 </style>
 </head>
@@ -59,7 +78,6 @@ button{background:#2c7be5;color:white;}
 </div>
 
 <button id="logoutBtn" onclick="logout()">Logout</button>
-<div id="adminInfo"></div>
 <div id="coords"></div>
 <div id="map"></div>
 
@@ -74,6 +92,23 @@ let map;
 let markerLayer;
 let currentUser;
 let isAdmin = false;
+
+// ENTER LOGIN
+document.addEventListener("keydown",function(e){
+ if(e.key === "Enter"){
+  login();
+ }
+});
+
+// SESSION CHECK (eingeloggt bleiben)
+window.onload = async function(){
+ const { data } = await db.auth.getSession();
+ if(data.session){
+  currentUser = data.session.user;
+  isAdmin = currentUser.email === "admin@gta.local";
+  startApp();
+ }
+};
 
 // LOGIN
 async function login(){
@@ -108,11 +143,6 @@ function startApp(){
  document.getElementById("map").style.display="block";
  document.getElementById("coords").style.display="block";
  document.getElementById("logoutBtn").style.display="block";
-
- if(isAdmin){
-  document.getElementById("adminInfo").innerText="ADMIN MODUS";
-  document.getElementById("adminInfo").style.display="block";
- }
 
  initMap();
  loadMarkers();
@@ -149,6 +179,7 @@ async function loadMarkers(){
 
  data.forEach(m=>{
   const icon = L.divIcon({
+   className:"",
    html:`<div style="
     background:${m.color};
     width:20px;height:20px;
@@ -172,7 +203,7 @@ async function loadMarkers(){
  });
 }
 
-// MARKER HINZUFÜGEN
+// ADD
 async function addMarker(e){
  const title = prompt("Titel:");
  if(!title) return;
@@ -191,7 +222,7 @@ async function addMarker(e){
  loadMarkers();
 }
 
-// BEARBEITEN
+// EDIT
 async function editMarker(id){
  const { data } = await db
   .from("markers")
@@ -210,7 +241,7 @@ async function editMarker(id){
  loadMarkers();
 }
 
-// LÖSCHEN
+// DELETE
 async function deleteMarker(id){
  if(!confirm("Wirklich löschen?")) return;
 
