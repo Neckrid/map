@@ -1,131 +1,184 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
-<title>GTA 5 Interactive Map</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>GTA 5 Map</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <style>
-body { margin:0; background:#111; font-family:Arial; }
-#map { height:100vh; }
-#coords {
- position:absolute;
- bottom:10px;
- left:10px;
- background:black;
- color:#00ff88;
- padding:6px;
- border-radius:6px;
+body{margin:0;background:#111;font-family:Arial;color:white;}
+#map{height:100vh;display:none;}
+.panel{
+ position:absolute;top:50%;left:50%;
+ transform:translate(-50%,-50%);
+ background:#1e1e1e;padding:25px;
+ border-radius:12px;width:90%;max-width:400px;
+ text-align:center;
+}
+input,button{
+ width:100%;padding:12px;margin:8px 0;
+ border-radius:8px;border:none;font-size:16px;
+}
+button{background:#2c7be5;color:white;}
+#coords{
+ position:absolute;bottom:10px;left:10px;
+ background:black;padding:6px 10px;
+ border-radius:8px;font-size:14px;
+ display:none;z-index:1000;
+}
+#logoutBtn{
+ position:absolute;top:10px;right:10px;
+ padding:8px 12px;
+ border:none;border-radius:6px;
+ background:#e55353;color:white;
+ display:none;
  z-index:1000;
 }
-#adminBtn {
- position:absolute;
- top:10px;
- left:10px;
+#adminInfo{
+ position:absolute;top:10px;left:10px;
+ background:#000;padding:6px 10px;
+ border-radius:6px;font-size:14px;
+ display:none;
  z-index:1000;
- padding:6px 10px;
 }
 </style>
 </head>
 
 <body>
 
-<button id="adminBtn">Admin Login</button>
-<div id="coords">X: 0 | Y: 0</div>
+<div id="loginPanel" class="panel">
+<h2>Login</h2>
+<input id="username" placeholder="Benutzername">
+<input id="password" type="password" placeholder="Passwort">
+<button onclick="login()">Login</button>
+<p id="msg"></p>
+</div>
+
+<button id="logoutBtn" onclick="logout()">Logout</button>
+<div id="adminInfo"></div>
+<div id="coords"></div>
 <div id="map"></div>
 
 <script>
 
-// =======================
-// SUPABASE DATEN EINTRAGEN
-// =======================
 const SUPABASE_URL = "https://iqobuepsbomgykdloxbg.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxb2J1ZXBzYm9tZ3lrZGxveGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4MjY3OTYsImV4cCI6MjA4NzQwMjc5Nn0.HC75pvLwxdD6860lBu-d1qma7SDRxvNETSBf9dqg8_E";
-const ADMIN_PASSWORD = "123";
-// =======================
 
-// Supabase Client (NUR EINMAL!)
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let adminMode = false;
+let map;
+let markerLayer;
+let currentUser;
+let isAdmin = false;
 
-const map = L.map('map', {
- crs: L.CRS.Simple,
- minZoom: -2,
- maxZoom: 2
-});
+// LOGIN
+async function login(){
+ const username = document.getElementById("username").value;
+ const password = document.getElementById("password").value;
 
-const bounds = [[0,0],[8192,8192]];
-L.imageOverlay("gta_map.png", bounds).addTo(map);
-map.fitBounds(bounds);
+ const fakeEmail = username + "@gta.local";
 
-let markerLayer = L.layerGroup().addTo(map);
-
-// Koordinaten anzeigen
-map.on("mousemove", e=>{
- document.getElementById("coords").innerText =
- "X: "+Math.round(e.latlng.lng)+" | Y: "+Math.round(e.latlng.lat);
-});
-
-// Admin Login
-document.getElementById("adminBtn").onclick = ()=>{
- const pass = prompt("Admin Passwort:");
- if(pass === ADMIN_PASSWORD){
-  adminMode = true;
-  alert("Admin Modus aktiviert");
-  loadMarkers();
- } else {
-  alert("Falsches Passwort");
- }
-};
-
-// Marker laden
-async function loadMarkers(){
- markerLayer.clearLayers();
-
- const { data, error } = await db
-   .from("markers")
-   .select("*");
+ const { data, error } =
+  await db.auth.signInWithPassword({
+   email: fakeEmail,
+   password: password
+  });
 
  if(error){
-   console.error(error);
-   return;
+  document.getElementById("msg").innerText = "Login fehlgeschlagen";
+ } else {
+  currentUser = data.user;
+  isAdmin = currentUser.email === "admin@gta.local";
+  startApp();
  }
+}
+
+// LOGOUT
+async function logout(){
+ await db.auth.signOut();
+ location.reload();
+}
+
+function startApp(){
+ document.getElementById("loginPanel").style.display="none";
+ document.getElementById("map").style.display="block";
+ document.getElementById("coords").style.display="block";
+ document.getElementById("logoutBtn").style.display="block";
+
+ if(isAdmin){
+  document.getElementById("adminInfo").innerText="ADMIN MODUS";
+  document.getElementById("adminInfo").style.display="block";
+ }
+
+ initMap();
+ loadMarkers();
+}
+
+// MAP
+function initMap(){
+ map = L.map('map',{
+  crs:L.CRS.Simple,
+  minZoom:-2,
+  maxZoom:2
+ });
+
+ const bounds = [[0,0],[8192,8192]];
+ L.imageOverlay("gta_map.png",bounds).addTo(map);
+ map.fitBounds(bounds);
+
+ markerLayer = L.layerGroup().addTo(map);
+
+ map.on("mousemove",e=>{
+  document.getElementById("coords").innerText =
+   "X:"+Math.round(e.latlng.lng)+" | Y:"+Math.round(e.latlng.lat);
+ });
+
+ if(isAdmin){
+  map.on("click",addMarker);
+ }
+}
+
+// MARKER LADEN
+async function loadMarkers(){
+ markerLayer.clearLayers();
+ const { data } = await db.from("markers").select("*");
 
  data.forEach(m=>{
   const icon = L.divIcon({
-   className:"",
-   html:`<div style="background:${m.color};
-   width:16px;height:16px;border-radius:50%;
-   border:2px solid white;"></div>`
+   html:`<div style="
+    background:${m.color};
+    width:20px;height:20px;
+    border-radius:50%;
+    border:3px solid white;"></div>`
   });
 
   const marker = L.marker([m.y,m.x],{icon})
-    .addTo(markerLayer);
+   .addTo(markerLayer);
 
-  marker.bindPopup(`
-   <b>${m.title}</b><br>
-   ${m.description}<br>
-   ${adminMode ? `
-    <button onclick="editMarker(${m.id})">Bearbeiten</button>
-    <button onclick="deleteMarker(${m.id})">Löschen</button>
-   `:""}
-  `);
+  let popupContent = "<b>"+m.title+"</b><br>"+m.description;
+
+  if(isAdmin){
+   popupContent += `
+   <br><button onclick="editMarker(${m.id})">Bearbeiten</button>
+   <button onclick="deleteMarker(${m.id})">Löschen</button>
+   `;
+  }
+
+  marker.bindPopup(popupContent);
  });
 }
 
-// Marker hinzufügen
-map.on("click", async e=>{
- if(!adminMode) return;
-
+// MARKER HINZUFÜGEN
+async function addMarker(e){
  const title = prompt("Titel:");
  if(!title) return;
 
  const description = prompt("Beschreibung:");
- const color = prompt("Farbe (#ff0000 oder blue):","#ff0000");
+ const color = prompt("Farbe:","#ff0000");
 
  await db.from("markers").insert([{
   title,
@@ -136,15 +189,15 @@ map.on("click", async e=>{
  }]);
 
  loadMarkers();
-});
+}
 
-// Bearbeiten
+// BEARBEITEN
 async function editMarker(id){
  const { data } = await db
-   .from("markers")
-   .select("*")
-   .eq("id",id)
-   .single();
+  .from("markers")
+  .select("*")
+  .eq("id",id)
+  .single();
 
  const title = prompt("Titel:",data.title);
  const description = prompt("Beschreibung:",data.description);
@@ -157,7 +210,7 @@ async function editMarker(id){
  loadMarkers();
 }
 
-// Löschen
+// LÖSCHEN
 async function deleteMarker(id){
  if(!confirm("Wirklich löschen?")) return;
 
@@ -168,9 +221,6 @@ async function deleteMarker(id){
  loadMarkers();
 }
 
-loadMarkers();
-
 </script>
-
 </body>
 </html>
