@@ -258,7 +258,7 @@ function startApp(){
 
 function initMap(){
  map=L.map('map',{crs:L.CRS.Simple,minZoom:-2,maxZoom:2});
- const bounds=[[0,0],[6144,9216]];
+ const bounds=[[0,0],[8192,8192]];
  L.imageOverlay("gta_map.png",bounds).addTo(map);
  map.fitBounds(bounds);
 
